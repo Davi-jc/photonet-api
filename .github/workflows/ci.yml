@@ -1,0 +1,73 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# ci.yml — Pipeline de Integração Contínua — PhotoNet API
+# Disciplina: Cloud Computing — UNIDAVI
+# Este workflow é acionado automaticamente a cada push ou pull request
+# na branch main, executando testes unitários e análise estática de código.
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: CI — PhotoNet API
+
+# Define os eventos que disparam o pipeline:
+# - push na branch main: garante que todo código integrado seja validado
+# - pull_request para main: valida antes de mesclar contribuições
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    # Define o sistema operacional do runner (máquina virtual do GitHub)
+    runs-on: ubuntu-latest
+
+    # Estratégia de matriz: testa em múltiplas versões do Node.js
+    # para garantir compatibilidade
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      # ── Passo 1: Checkout do código ──────────────────────────────────────
+      # Clona o repositório no runner para que os passos seguintes
+      # tenham acesso ao código-fonte.
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      # ── Passo 2: Configuração do ambiente Node.js ─────────────────────────
+      # Instala a versão do Node.js definida na matriz de estratégia.
+      # O cache de dependências npm acelera execuções futuras.
+      - name: Configurar Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      # ── Passo 3: Instalação de dependências ──────────────────────────────
+      # Instala todas as dependências listadas em package.json,
+      # incluindo as de desenvolvimento (jest, supertest, eslint).
+      - name: Instalar dependências
+        run: npm install
+
+      # ── Passo 4: Análise estática de código (Lint) ───────────────────────
+      # Etapa adicional exigida: executa o ESLint para verificar
+      # padrões de código, erros de sintaxe e formatação.
+      # Garante que o código segue as regras definidas em .eslintrc.json.
+      - name: Análise estática com ESLint
+        run: npm run lint
+
+      # ── Passo 5: Execução dos testes unitários com cobertura ─────────────
+      # Roda todos os testes com Jest e gera relatório de cobertura de código.
+      # A cobertura indica quais linhas do código foram exercitadas pelos testes.
+      - name: Executar testes unitários (com cobertura)
+        run: npm test
+
+      # ── Passo 6: Upload do relatório de cobertura ─────────────────────────
+      # Publica o relatório de cobertura como artefato no GitHub Actions,
+      # permitindo que o time visualize quais partes do código estão cobertas.
+      - name: Publicar relatório de cobertura como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-node-${{ matrix.node-version }}
+          path: coverage/
+          retention-days: 7
